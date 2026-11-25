@@ -50,3 +50,15 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+# Build artifacts
+build/
+test/
+-p/
+*.o
+*.out
+*.exe
+
+# IDE & OS
+.vscode/
+.DS_Store
