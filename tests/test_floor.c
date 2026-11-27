@@ -1,4 +1,4 @@
-/* test_floor.c — інваріанти випадкової генерації поверху (200 різних seed). */
+// test_floor.c - тест генерації поверху
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -6,6 +6,7 @@
 #include "room.h"
 
 int main(void) {
+    // Перевірка 200 випадкових поверхів
     for (unsigned seed = 1; seed <= 200; seed++) {
         srand(seed);
         Floor f;
@@ -17,33 +18,31 @@ int main(void) {
         for (int i = 0; i < f.room_count; i++) {
             Room *r = &f.rooms[i];
 
-            /* 1..3 двері у кожній кімнаті */
             int doors = 0;
             for (int d = 0; d < DIR_COUNT; d++) {
                 int t = r->door_target[d];
                 if (t < 0) continue;
                 doors++;
-                /* двері взаємні: з іншого боку протилежні двері ведуть назад */
+
                 assert(t < f.room_count);
                 assert(f.rooms[t].door_target[dir_opposite((Direction)d)] == i);
             }
             assert(doors >= 1 && doors <= MAX_DOORS);
 
-            /* стартова кімната без ворогів, решта — з ворогами */
             if (i == f.start_room) assert(room_alive_enemies(r) == 0);
             else assert(room_alive_enemies(r) >= 1 && room_alive_enemies(r) <= MAX_ENEMIES);
 
             if (r->exit_dir >= 0) {
                 exits++;
-                assert(i != f.start_room);            /* вихід не в стартовій кімнаті */
-                assert(r->exit_dir != DIR_DOWN);      /* на нижній стіні виходу немає */
-                assert(r->door_target[r->exit_dir] == -1); /* стіна не зайнята дверима */
+                assert(i != f.start_room);
+                assert(r->exit_dir != DIR_DOWN);
+                assert(r->door_target[r->exit_dir] == -1);
             }
         }
         assert(exits == 1);
     }
 
-    /* Масив-екран: стіни по краях, гравець у центрі, двері на місці. */
+    // Масив-екран стартової кімнати
     srand(7);
     Floor f;
     floor_generate(&f, 1);
@@ -58,7 +57,7 @@ int main(void) {
         int x, y;
         room_door_cell((Direction)d, &x, &y);
         char want = (d == DIR_UP || d == DIR_DOWN) ? TILE_DOOR_H : TILE_DOOR_V;
-        assert(grid[y][x].kind == want && grid[y][x].open == 1); /* без ворогів двері відкриті */
+        assert(grid[y][x].kind == want && grid[y][x].open == 1);
     }
 
     printf("test_floor: OK\n");

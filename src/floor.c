@@ -1,16 +1,10 @@
-/*
- * floor.c — випадкова генерація поверху.
- *
- * Алгоритм: кімнати "виростають" на сітці від стартової. Кожна нова кімната
- * чіпляється дверима до випадкової існуючої сусідньою клітинкою сітки.
- * Виходить зв'язне дерево: кожна кімната має мінімум 1 двері, максимум 3.
- */
+// floor.c - випадкова генерація поверху
 #include <stdlib.h>
 #include <string.h>
 #include "floor.h"
 #include "room.h"
 
-#define GRID (2 * MAX_ROOMS + 1)   /* сітка з запасом, щоб не вийти за межі */
+#define GRID (2 * MAX_ROOMS + 1)
 
 static int add_room(Floor *f, int map[GRID][GRID], int gx, int gy) {
     int id = f->room_count++;
@@ -28,6 +22,7 @@ static int door_count(const Room *r) {
     return n;
 }
 
+// Генерація поверху: кімнати, двері, вихід, вороги
 void floor_generate(Floor *f, int floor_number) {
     int map[GRID][GRID];
     for (int y = 0; y < GRID; y++)
@@ -36,11 +31,11 @@ void floor_generate(Floor *f, int floor_number) {
     memset(f, 0, sizeof *f);
     f->room_count = 0;
 
-    /* Стартова кімната — у центрі сітки. */
+    // Стартова кімната в центрі сітки
     f->start_room = add_room(f, map, GRID / 2, GRID / 2);
 
-    /* ---- 1. Нарощуємо кімнати ---- */
-    int target = MIN_ROOMS + rand() % (MAX_ROOMS - MIN_ROOMS + 1);   /* 5..7 */
+    // Додавання кімнат до випадкової наявної, поки їх не буде 5-7
+    int target = MIN_ROOMS + rand() % (MAX_ROOMS - MIN_ROOMS + 1);
     int attempts = 0;
     while (f->room_count < target && attempts++ < 5000) {
         int parent = rand() % f->room_count;
@@ -52,14 +47,15 @@ void floor_generate(Floor *f, int floor_number) {
         int nx = p->grid_x + DIR_DX[d];
         int ny = p->grid_y + DIR_DY[d];
         if (nx < 0 || ny < 0 || nx >= GRID || ny >= GRID) continue;
-        if (map[ny][nx] != -1) continue;                 /* клітинка вже зайнята */
+        if (map[ny][nx] != -1) continue;
 
         int id = add_room(f, map, nx, ny);
-        p->door_target[d] = id;                          /* двері туди ... */
-        f->rooms[id].door_target[dir_opposite(d)] = parent; /* ... і двері назад */
+        // Двері в обидва боки
+        p->door_target[d] = id;
+        f->rooms[id].door_target[dir_opposite(d)] = parent;
     }
 
-    /* ---- 2. Відстані від старту (BFS по дверях) ---- */
+    // Відстані від старту (пошук у ширину)
     int dist[MAX_ROOMS], queue[MAX_ROOMS], qh = 0, qt = 0;
     for (int i = 0; i < MAX_ROOMS; i++) dist[i] = -1;
     dist[f->start_room] = 0;
@@ -75,7 +71,7 @@ void floor_generate(Floor *f, int floor_number) {
         }
     }
 
-    /* ---- 3. Вихід: у найдальшій кімнаті, на вільній стіні (не низ) ---- */
+    // Вихід у найдальшій кімнаті на вільній стіні (не знизу)
     static const Direction exit_dirs[3] = { DIR_UP, DIR_RIGHT, DIR_LEFT };
     int maxd = 0;
     for (int i = 0; i < f->room_count; i++)
@@ -86,7 +82,7 @@ void floor_generate(Floor *f, int floor_number) {
         for (int i = 0; i < f->room_count; i++) {
             if (dist[i] != dd) continue;
             for (int k = 0; k < 3; k++)
-                if (f->rooms[i].door_target[exit_dirs[k]] == -1) {   /* стіна вільна від дверей */
+                if (f->rooms[i].door_target[exit_dirs[k]] == -1) {
                     cand_room[n] = i;
                     cand_dir[n] = exit_dirs[k];
                     n++;
@@ -99,7 +95,7 @@ void floor_generate(Floor *f, int floor_number) {
         }
     }
 
-    /* ---- 4. Вороги у всіх кімнатах, крім стартової ---- */
+    // Вороги в усіх кімнатах, крім стартової
     for (int i = 0; i < f->room_count; i++)
         if (i != f->start_room) room_spawn_enemies(&f->rooms[i], floor_number);
 }

@@ -1,4 +1,4 @@
-/* render.h — малювання екранів у терміналі (ANSI-кольори). */
+// render.h - малювання екранів
 #ifndef RENDER_H
 #define RENDER_H
 #include "types.h"

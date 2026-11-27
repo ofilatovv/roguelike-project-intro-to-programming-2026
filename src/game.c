@@ -1,8 +1,4 @@
-/*
- * game.c — ядро правил. Один виклик game_move_player() = один повний хід:
- *   1) дія гравця (крок / удар / підбір / перехід через двері);
- *   2) хід усіх живих ворогів.
- */
+// game.c - правила ходу, очки, смерть
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,7 +10,6 @@
 #include "room.h"
 #include "stats.h"
 
-/* printf-подібне встановлення службового повідомлення. */
 static void set_message(Game *g, const char *fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
@@ -22,7 +17,6 @@ static void set_message(Game *g, const char *fmt, ...) {
     va_end(ap);
 }
 
-/* Дописує текст до поточного повідомлення (щоб кілька подій одного ходу були видні разом). */
 static void append_message(Game *g, const char *fmt, ...) {
     size_t len = strlen(g->message);
     if (len >= MSG_LEN - 1) return;
@@ -44,10 +38,7 @@ void game_init(Game *g, const Stats *stats, const char *stats_path) {
     g->message[0] = '\0';
 }
 
-/*
- * Змінює очки. Одразу порівнюємо з max_score:
- * якщо current_score > max_score — оновлюємо рекорд і пишемо у файл.
- */
+// Зміна очок з оновленням max_score
 void game_add_score(Game *g, int delta) {
     g->score += delta;
     if (g->score < 0) g->score = 0;
@@ -57,7 +48,7 @@ void game_add_score(Game *g, int delta) {
     }
 }
 
-/* Створює новий поверх; гравець з'являється посередині порожньої стартової кімнати. */
+// Новий поверх, гравець у центрі стартової кімнати
 static void enter_floor(Game *g, int floor_number) {
     g->floor_number = floor_number;
     floor_generate(&g->floor, floor_number);
@@ -66,8 +57,9 @@ static void enter_floor(Game *g, int floor_number) {
     g->player.y = ROOM_CENTER;
 }
 
+// Початок забігу, runs_played + 1
 void game_start_run(Game *g) {
-    g->stats.runs_played++;                 /* кожен початок забігу = +1 до runs played */
+    g->stats.runs_played++;
     if (g->stats_path) stats_save(&g->stats, g->stats_path);
 
     g->score = 0;
@@ -78,7 +70,7 @@ void game_start_run(Game *g) {
     set_message(g, "Find the purple exit!");
 }
 
-/* Втрата HP: штраф -20 очок за кожну одиницю + перевірка смерті. */
+// Штраф -20 очок за кожне втрачене HP, перевірка смерті
 static void apply_hp_loss(Game *g, int lost) {
     if (lost > 0) game_add_score(g, -SCORE_HP_LOSS * lost);
     if (g->player.hp <= 0) {
@@ -88,7 +80,7 @@ static void apply_hp_loss(Game *g, int lost) {
     }
 }
 
-/* Якщо щойно убили останнього ворога — один раз розігруємо нагороду. */
+// Нагорода після зачистки кімнати
 static void check_room_cleared(Game *g) {
     Room *room = game_room(g);
     if (room_alive_enemies(room) == 0 && !room->reward_rolled) {
@@ -99,7 +91,7 @@ static void check_room_cleared(Game *g) {
     }
 }
 
-/* Підбір предмета, на який наступив гравець. */
+// Підбір предмета
 static void pickup_item(Game *g) {
     Room *room = game_room(g);
     Item *it = room_item_at(room, g->player.x, g->player.y);
@@ -108,19 +100,19 @@ static void pickup_item(Game *g) {
     if (it->type == ITEM_COIN) {
         game_add_score(g, SCORE_COIN);
         set_message(g, "+%d points (coin)", SCORE_COIN);
-    } else { /* зілля */
+    } else {
         if (g->player.hp < g->player.max_hp) {
             g->player.hp++;
             set_message(g, "+1 HP (potion)");
-        } else {                         /* HP повне -> замість лікування очки */
+        } else {
             game_add_score(g, SCORE_POTION_FULL);
             set_message(g, "+%d points (potion at full HP)", SCORE_POTION_FULL);
         }
     }
-    it->type = ITEM_NONE;               /* слот знову вільний */
+    it->type = ITEM_NONE;
 }
 
-/* Хід усіх ворогів. wasted = гравець даремно витратив хід (вперся в стіну). */
+// Хід ворогів: удар при даремному ході гравця, інакше рух до гравця
 static void enemies_turn(Game *g, int wasted) {
     Room *room = game_room(g);
     for (int i = 0; i < room->enemy_count && !g->dead; i++) {
@@ -129,24 +121,22 @@ static void enemies_turn(Game *g, int wasted) {
 
         if (entity_is_adjacent(e, &g->player)) {
             if (wasted) {
-                /* Гравець упирається в стіну/двері, ворог поруч -> гарантований удар. */
                 g->player.hp -= 1;
                 apply_hp_loss(g, 1);
                 if (!g->dead) set_message(g, "An enemy hits you while you stumble!");
             }
-            /* Інакше ворог просто стоїть поруч і чекає (б'є лише у відповідь). */
+
         } else {
             enemy_step_toward(room, e, &g->player);
         }
     }
 }
 
-/* Перехід через двері до сусідньої кімнати. */
+// Перехід у сусідню кімнату
 static void use_door(Game *g, Direction d) {
     Room *cur = game_room(g);
     g->current_room = cur->door_target[d];
 
-    /* Заходимо через протилежні двері: вийшли праворуч -> з'явились біля лівих. */
     int ex, ey;
     room_entry_cell(dir_opposite(d), &ex, &ey);
     g->player.x = ex;
@@ -156,42 +146,43 @@ static void use_door(Game *g, Direction d) {
     else                                       set_message(g, "This room is quiet.");
 }
 
-/* Перехід на наступний поверх: +500 очок, нова мапа, порожня стартова кімната. */
+// Перехід на наступний поверх
 static void use_exit(Game *g) {
     game_add_score(g, SCORE_NEXT_FLOOR);
     enter_floor(g, g->floor_number + 1);
     set_message(g, "Descended to floor %d! (+%d)", g->floor_number, SCORE_NEXT_FLOOR);
 }
 
+// Один хід гравця: двері, вихід, стіна, бій або рух
 void game_move_player(Game *g, Direction d) {
     if (g->dead) return;
 
     Room *room = game_room(g);
     int nx = g->player.x + DIR_DX[d];
     int ny = g->player.y + DIR_DY[d];
-    int wasted = 0;   /* 1 = гравець нікуди не пішов і нікого не вдарив */
+    int wasted = 0;
 
     int door = room_door_dir_at(room, nx, ny);
 
     if (door >= 0) {
         if (room_is_open(room)) { use_door(g, (Direction)door); return; }
-        wasted = 1;                                   /* зачинені двері = як стіна */
+        wasted = 1;
         set_message(g, "The door is sealed.");
     } else if (room_exit_at(room, nx, ny)) {
         if (room_is_open(room)) { use_exit(g); return; }
         wasted = 1;
         set_message(g, "The exit is sealed.");
     } else if (nx <= 0 || ny <= 0 || nx >= ROOM_SIZE - 1 || ny >= ROOM_SIZE - 1) {
-        wasted = 1;                                   /* стіна "#" */
+        wasted = 1;
         set_message(g, "You bump into a wall.");
     } else {
         Entity *enemy = room_enemy_at(room, nx, ny);
         if (enemy) {
-            /* Удар по ворогу: гравець не рухається, бій вирішує combat.c. */
             int lost = combat_player_attack(&g->player, enemy, rand() % 100);
             if (enemy->hp <= 0) {
                 game_add_score(g, SCORE_KILL);
-                /* 50%: вбитий ворог залишає зілля прямо під собою. */
+
+                // 50% шанс залишити зілля під убитим ворогом
                 int dropped = 0;
                 if (rand() % 100 < ENEMY_POTION_DROP_CHANCE)
                     dropped = room_place_item(room, ITEM_POTION, enemy->x, enemy->y, &g->player);
@@ -205,11 +196,12 @@ void game_move_player(Game *g, Direction d) {
             apply_hp_loss(g, lost);
             check_room_cleared(g);
         } else {
-            g->player.x = nx;                         /* вільна клітинка — просто йдемо */
+            g->player.x = nx;
             g->player.y = ny;
             pickup_item(g);
         }
     }
 
+    // Хід ворогів після дії гравця
     enemies_turn(g, wasted);
 }

@@ -1,4 +1,4 @@
-/* test_game.c — правила ходу: стіни, бій, двері, нагороди, очки, смерть. */
+// test_game.c - тест правил ходу
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -6,7 +6,6 @@
 #include "room.h"
 #include "stats.h"
 
-/* Новий забіг без запису у файл. */
 static void setup(Game *g, unsigned seed) {
     srand(seed);
     Stats s;
@@ -22,7 +21,6 @@ static void put_enemy(Room *r, int x, int y, int hp) {
     r->reward_rolled = 0;
 }
 
-/* Кладе єдиний предмет у слот 0 (кімната в тестах попередньо порожня). */
 static void put_item(Room *r, ItemType t, int x, int y) {
     r->items[0].type = t; r->items[0].x = x; r->items[0].y = y;
 }
@@ -30,7 +28,7 @@ static void put_item(Room *r, ItemType t, int x, int y) {
 int main(void) {
     Game g;
 
-    /* --- старт забігу --- */
+    // Старт забігу, стіна, крок
     setup(&g, 1);
     assert(g.stats.runs_played == 1);
     assert(g.score == 0 && g.floor_number == 1);
@@ -38,23 +36,21 @@ int main(void) {
     assert(g.player.x == ROOM_CENTER && g.player.y == ROOM_CENTER);
     assert(room_alive_enemies(game_room(&g)) == 0);
 
-    /* --- стіна: гравець лишається на місці --- */
     g.player.x = 1; g.player.y = 1;
     game_move_player(&g, DIR_UP);
     assert(g.player.x == 1 && g.player.y == 1 && g.player.hp == 5);
 
-    /* --- звичайний крок --- */
     game_move_player(&g, DIR_RIGHT);
     assert(g.player.x == 2 && g.player.y == 1);
 
-    /* --- ворог іде до гравця --- */
+    // Ворог іде до гравця
     setup(&g, 2);
     put_enemy(game_room(&g), 10, 1, 3);
     g.player.x = 1; g.player.y = 1;
-    game_move_player(&g, DIR_UP);                       /* даремний хід у стіну */
+    game_move_player(&g, DIR_UP);
     assert(game_room(&g)->enemies[0].x == 9);
 
-    /* --- стіна + ворог поруч = гарантований удар і штраф -20 --- */
+    // Удар при даремному ході, смерть
     setup(&g, 3);
     put_enemy(game_room(&g), 2, 1, 3);
     g.player.x = 1; g.player.y = 1;
@@ -62,12 +58,11 @@ int main(void) {
     game_move_player(&g, DIR_UP);
     assert(g.player.hp == 4 && g.score == 80);
 
-    /* --- смерть --- */
     g.player.hp = 1;
     game_move_player(&g, DIR_UP);
     assert(g.dead && g.player.hp == 0);
 
-    /* --- вбивство ворога: +100, нагорода розіграна один раз --- */
+    // Вбивство ворога
     setup(&g, 4);
     put_enemy(game_room(&g), 2, 1, 1);
     g.player.x = 1; g.player.y = 1;
@@ -76,15 +71,15 @@ int main(void) {
     assert(g.score == 100 && g.player.hp == 5 && g.player.x == 1);
     assert(game_room(&g)->reward_rolled == 1);
 
-    /* --- монета: +100 --- */
+    // Монета
     setup(&g, 5);
     put_item(game_room(&g), ITEM_COIN, 2, 1);
     g.player.x = 1; g.player.y = 1;
     game_move_player(&g, DIR_RIGHT);
     assert(g.score == 100 && game_room(&g)->items[0].type == ITEM_NONE);
-    assert(g.stats.max_score == 100);            /* рекорд оновився одразу */
+    assert(g.stats.max_score == 100);
 
-    /* --- зілля: лікує, а при повному HP дає +300 очок --- */
+    // Зілля
     setup(&g, 6);
     put_item(game_room(&g), ITEM_POTION, 2, 1);
     g.player.x = 1; g.player.y = 1; g.player.hp = 3;
@@ -97,15 +92,15 @@ int main(void) {
 
     put_item(game_room(&g), ITEM_POTION, 4, 1);
     game_move_player(&g, DIR_RIGHT);
-    assert(g.player.hp == 5 && g.score == 300);  /* HP не стало 6 */
+    assert(g.player.hp == 5 && g.score == 300);
 
-    /* --- max_score не зменшується, коли поточні очки нижчі --- */
+    // max_score не зменшується
     g.stats.max_score = 3200;
     g.score = 2000;
     game_add_score(&g, -20);
     assert(g.stats.max_score == 3200 && g.score == 1980);
 
-    /* --- двері: відкриті пропускають, зачинені — ні --- */
+    // Двері
     setup(&g, 7);
     Room *start = game_room(&g);
     int d = -1;
@@ -114,23 +109,23 @@ int main(void) {
     int target = start->door_target[d];
     int ex, ey;
 
-    put_enemy(start, 5, 5, 3);                    /* ворог -> двері зачинені */
+    put_enemy(start, 5, 5, 3);
     room_entry_cell((Direction)d, &ex, &ey);
     g.player.x = ex; g.player.y = ey;
     game_move_player(&g, (Direction)d);
-    assert(g.current_room == g.floor.start_room); /* не пройшли */
+    assert(g.current_room == g.floor.start_room);
 
-    start->enemies[0].hp = 0;                     /* ворога немає -> двері відкриті */
+    start->enemies[0].hp = 0;
     g.player.x = ex; g.player.y = ey;
     game_move_player(&g, (Direction)d);
     assert(g.current_room == target);
     room_entry_cell(dir_opposite((Direction)d), &ex, &ey);
-    assert(g.player.x == ex && g.player.y == ey); /* з'явились біля протилежних дверей */
+    assert(g.player.x == ex && g.player.y == ey);
 
-    /* --- вихід на наступний поверх: +500 і порожня стартова кімната --- */
+    // Вихід на наступний поверх
     setup(&g, 8);
     start = game_room(&g);
-    start->door_target[DIR_RIGHT] = -1;           /* звільняємо праву стіну під вихід */
+    start->door_target[DIR_RIGHT] = -1;
     start->exit_dir = DIR_RIGHT;
     g.player.x = ROOM_SIZE - 2; g.player.y = ROOM_CENTER;
     game_move_player(&g, DIR_RIGHT);
@@ -138,24 +133,23 @@ int main(void) {
     assert(g.player.x == ROOM_CENTER && g.player.y == ROOM_CENTER);
     assert(room_alive_enemies(game_room(&g)) == 0);
 
-    /* --- вбитий ворог залишає зілля під собою у ~50% випадків --- */
+    // Дроп зілля з ворога (статистика)
     int drops = 0, N = 2000;
     for (int i = 0; i < N; i++) {
         setup(&g, 1000 + (unsigned)i);
         put_enemy(game_room(&g), 2, 1, 1);
         g.player.x = 1; g.player.y = 1;
         game_move_player(&g, DIR_RIGHT);
-        Item *it = room_item_at(game_room(&g), 2, 1);   /* саме клітинка, де стояв ворог */
+        Item *it = room_item_at(game_room(&g), 2, 1);
         if (it && it->type == ITEM_POTION) drops++;
     }
     assert(drops > N * 45 / 100 && drops < N * 55 / 100);
 
-    /* --- дроп не затирає гравця: якщо клітинка зайнята предметом, зілля лягає поруч --- */
     {
         Room r; room_init(&r);
         Entity p = { 1, 1, 5, 5 };
         assert(room_place_item(&r, ITEM_COIN, 5, 5, &p) == 1);
-        assert(room_place_item(&r, ITEM_POTION, 5, 5, &p) == 1);   /* (5,5) зайнято -> сусідня */
+        assert(room_place_item(&r, ITEM_POTION, 5, 5, &p) == 1);
         assert(room_item_at(&r, 5, 5)->type == ITEM_COIN);
         int potions = 0;
         for (int i = 0; i < MAX_ITEMS; i++) if (r.items[i].type == ITEM_POTION) potions++;

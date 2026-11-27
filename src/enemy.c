@@ -1,16 +1,14 @@
-/*
- * enemy.c — ШІ ворога. Після кожного кроку гравця ворог робить 1 крок до нього.
- */
+// enemy.c - рух ворога до гравця
 #include <stdlib.h>
 #include "enemy.h"
 #include "room.h"
 
-/* Сусідство "клітинка до клітинки": сума відстаней по осях дорівнює 1. */
+// Сусідні клітинки без діагоналей
 int entity_is_adjacent(const Entity *a, const Entity *b) {
     return abs(a->x - b->x) + abs(a->y - b->y) == 1;
 }
 
-/* Чи може ворог стати у (x,y): всередині кімнати, не на гравці, не на іншому ворогові. */
+// Перевірка, чи вільна клітинка для ворога
 static int cell_free_for_enemy(const Room *room, const Entity *self,
                                const Entity *player, int x, int y) {
     if (x <= 0 || x >= ROOM_SIZE - 1 || y <= 0 || y >= ROOM_SIZE - 1) return 0;
@@ -22,24 +20,23 @@ static int cell_free_for_enemy(const Room *room, const Entity *self,
     return 1;
 }
 
+// Один крок: спершу по осі з більшою відстанню, потім по іншій
 void enemy_step_toward(const Room *room, Entity *enemy, const Entity *player) {
     int dx = player->x - enemy->x;
     int dy = player->y - enemy->y;
-    int sx = (dx > 0) - (dx < 0);   /* знак: -1, 0 або 1 */
+    int sx = (dx > 0) - (dx < 0);
     int sy = (dy > 0) - (dy < 0);
 
-    /* Спершу крокуємо по осі з більшою відстанню, потім пробуємо іншу вісь. */
     int try_x_first = abs(dx) >= abs(dy);
     for (int pass = 0; pass < 2; pass++) {
         int use_x = (pass == 0) ? try_x_first : !try_x_first;
         int nx = enemy->x + (use_x ? sx : 0);
         int ny = enemy->y + (use_x ? 0 : sy);
-        if ((use_x ? sx : sy) == 0) continue;  /* по цій осі вже збігаємось */
+        if ((use_x ? sx : sy) == 0) continue;
         if (cell_free_for_enemy(room, enemy, player, nx, ny)) {
             enemy->x = nx;
             enemy->y = ny;
             return;
         }
     }
-    /* Обидва напрямки заблоковані — ворог стоїть. */
 }

@@ -1,25 +1,22 @@
-/*
- * room.c — усе, що стосується однієї кімнати:
- * координати дверей, вороги, нагорода та побудова двовимірного масиву 21x21.
- */
+// room.c - кімната: двері, вороги, предмети, масив 21x21
 #include <stdlib.h>
 #include "room.h"
 
-/* Зсуви для напрямків: UP, RIGHT, DOWN, LEFT. */
+// Зсуви для напрямків UP, RIGHT, DOWN, LEFT
 const int DIR_DX[DIR_COUNT] = { 0, 1, 0, -1 };
 const int DIR_DY[DIR_COUNT] = { -1, 0, 1, 0 };
 
 Direction dir_opposite(Direction d) {
-    return (Direction)((d + 2) % DIR_COUNT);   /* UP<->DOWN, LEFT<->RIGHT */
+    return (Direction)((d + 2) % DIR_COUNT);
 }
 
-/* Двері лежать рівно по центру стіни: центр + напрямок * 10. */
+// Двері по центру стіни
 void room_door_cell(Direction d, int *x, int *y) {
     *x = ROOM_CENTER + DIR_DX[d] * ROOM_CENTER;
     *y = ROOM_CENTER + DIR_DY[d] * ROOM_CENTER;
 }
 
-/* Клітинка, на якій з'являється гравець, зайшовши в кімнату через ці двері. */
+// Клітинка біля дверей, де з'являється гравець
 void room_entry_cell(Direction d, int *x, int *y) {
     *x = ROOM_CENTER + DIR_DX[d] * (ROOM_CENTER - 1);
     *y = ROOM_CENTER + DIR_DY[d] * (ROOM_CENTER - 1);
@@ -33,7 +30,7 @@ void room_init(Room *r) {
         r->items[i].type = ITEM_NONE;
         r->items[i].x = r->items[i].y = 0;
     }
-    r->reward_rolled = 1;   /* без ворогів нагороди за зачистку немає */
+    r->reward_rolled = 1;
 }
 
 int room_alive_enemies(const Room *r) {
@@ -43,7 +40,6 @@ int room_alive_enemies(const Room *r) {
     return n;
 }
 
-/* Двері й вихід відчинені тоді й лише тоді, коли в кімнаті не лишилось ворогів. */
 int room_is_open(const Room *r) {
     return room_alive_enemies(r) == 0;
 }
@@ -73,7 +69,7 @@ int room_exit_at(const Room *r, int x, int y) {
     return ex == x && ey == y;
 }
 
-/* Створює ворогів. Їх кількість трохи зростає з номером поверху. */
+// Створення ворогів у випадкових клітинках
 void room_spawn_enemies(Room *r, int floor_number) {
     int count = 1 + rand() % (3 + floor_number / 3);
     if (count > MAX_ENEMIES) count = MAX_ENEMIES;
@@ -81,7 +77,6 @@ void room_spawn_enemies(Room *r, int floor_number) {
     for (int i = 0; i < count; i++) {
         int x, y, clash;
         do {
-            /* Діапазон 3..17: подалі від клітинок біля дверей, де з'являється гравець. */
             x = 3 + rand() % (ROOM_SIZE - 6);
             y = 3 + rand() % (ROOM_SIZE - 6);
             clash = 0;
@@ -95,7 +90,7 @@ void room_spawn_enemies(Room *r, int floor_number) {
         r->enemies[i].max_hp = ENEMY_START_HP;
     }
     r->enemy_count = count;
-    r->reward_rolled = 0;   /* нагороду розіграємо, коли всіх уб'ють */
+    r->reward_rolled = 0;
 }
 
 Item *room_item_at(Room *r, int x, int y) {
@@ -105,10 +100,7 @@ Item *room_item_at(Room *r, int x, int y) {
     return NULL;
 }
 
-/*
- * Кладе предмет у клітинку (cx,cy). Якщо вона зайнята (гравцем чи іншим
- * предметом) — шукає найближчу вільну кільцями навколо: радіус 0, 1, 2, ...
- */
+// Розміщення предмета в клітинці або в найближчій вільній
 int room_place_item(Room *r, ItemType type, int cx, int cy, const Entity *player) {
     Item *slot = NULL;
     for (int i = 0; i < MAX_ITEMS; i++)
@@ -118,9 +110,9 @@ int room_place_item(Room *r, ItemType type, int cx, int cy, const Entity *player
     for (int rad = 0; rad < ROOM_SIZE; rad++) {
         for (int dy = -rad; dy <= rad; dy++) {
             for (int dx = -rad; dx <= rad; dx++) {
-                if (abs(dx) != rad && abs(dy) != rad) continue;   /* лише межа кільця */
+                if (abs(dx) != rad && abs(dy) != rad) continue;
                 int x = cx + dx, y = cy + dy;
-                if (x < 1 || y < 1 || x > ROOM_SIZE - 2 || y > ROOM_SIZE - 2) continue; /* не в стіну */
+                if (x < 1 || y < 1 || x > ROOM_SIZE - 2 || y > ROOM_SIZE - 2) continue;
                 if (player->x == x && player->y == y) continue;
                 if (room_item_at(r, x, y)) continue;
                 slot->x = x;
@@ -133,17 +125,12 @@ int room_place_item(Room *r, ItemType type, int cx, int cy, const Entity *player
     return 0;
 }
 
-/*
- * Розіграш нагороди після зачистки. Один кидок 0..99:
- *   монета: 0..24 (завжди 25%)
- *   зілля : наступні 25% — або 50%, якщо HP гравця строго менше 3.
- * Нагорода кладеться в центр кімнати (або поруч, якщо центр зайнятий).
- */
+// Нагорода за зачистку: монета 25%, зілля 25% (50% при HP менше 3)
 ItemType room_roll_reward(Room *r, const Entity *player) {
     r->reward_rolled = 1;
 
     int potion_chance = REWARD_POTION_CHANCE;
-    if (player->hp < LOW_HP_THRESHOLD)      /* саме "<", а не "<=": при HP == 3 бонусу немає */
+    if (player->hp < LOW_HP_THRESHOLD)
         potion_chance *= 2;
 
     int roll = rand() % 100;
@@ -155,14 +142,11 @@ ItemType room_roll_reward(Room *r, const Entity *player) {
     return room_place_item(r, type, ROOM_CENTER, ROOM_CENTER, player) ? type : ITEM_NONE;
 }
 
-/*
- * Будує двовимірний масив-екран. Шари малюються знизу вгору:
- * підлога/стіни -> двері/вихід -> предмет -> вороги -> гравець.
- */
+// Побудова масиву 21x21 шарами
 void room_build_grid(const Room *r, const Entity *player, Tile grid[ROOM_SIZE][ROOM_SIZE]) {
     int open = room_is_open(r);
 
-    /* 1. Підлога всередині, стіни по периметру. */
+    // Підлога і стіни
     for (int y = 0; y < ROOM_SIZE; y++) {
         for (int x = 0; x < ROOM_SIZE; x++) {
             int border = (x == 0 || y == 0 || x == ROOM_SIZE - 1 || y == ROOM_SIZE - 1);
@@ -171,7 +155,7 @@ void room_build_grid(const Room *r, const Entity *player, Tile grid[ROOM_SIZE][R
         }
     }
 
-    /* 2. Двері: на верхній/нижній стіні "—", на лівій/правій "|". */
+    // Двері
     for (int d = 0; d < DIR_COUNT; d++) {
         if (r->door_target[d] < 0) continue;
         int x, y;
@@ -180,7 +164,7 @@ void room_build_grid(const Room *r, const Entity *player, Tile grid[ROOM_SIZE][R
         grid[y][x].open = open;
     }
 
-    /* 3. Вихід на наступний поверх: ">" праворуч, "<" ліворуч, "^" угорі. */
+    // Вихід на наступний поверх
     if (r->exit_dir >= 0) {
         int x, y;
         room_door_cell((Direction)r->exit_dir, &x, &y);
@@ -189,17 +173,17 @@ void room_build_grid(const Room *r, const Entity *player, Tile grid[ROOM_SIZE][R
         grid[y][x].open = open;
     }
 
-    /* 4. Нагорода. */
+    // Предмети
     for (int i = 0; i < MAX_ITEMS; i++)
         if (r->items[i].type != ITEM_NONE)
             grid[r->items[i].y][r->items[i].x].kind =
                 (r->items[i].type == ITEM_COIN) ? TILE_COIN : TILE_POTION;
 
-    /* 5. Живі вороги. */
+    // Вороги
     for (int i = 0; i < r->enemy_count; i++)
         if (r->enemies[i].hp > 0)
             grid[r->enemies[i].y][r->enemies[i].x].kind = TILE_ENEMY;
 
-    /* 6. Гравець завжди зверху. */
+    // Гравець зверху
     grid[player->y][player->x].kind = TILE_PLAYER;
 }

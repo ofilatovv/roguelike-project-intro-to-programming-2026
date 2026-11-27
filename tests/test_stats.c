@@ -1,4 +1,4 @@
-/* test_stats.c — збереження/читання файлу статистики. */
+// test_stats.c - тест файлу статистики
 #include <assert.h>
 #include <stdio.h>
 #include "stats.h"
@@ -7,12 +7,12 @@ int main(void) {
     const char *path = "build/test_stats.tmp";
     remove(path);
 
-    /* файлу немає -> нулі */
+    // Файлу немає
     Stats s;
     assert(stats_load(&s, path) == 0);
     assert(s.runs_played == 0 && s.max_score == 0);
 
-    /* запис і читання назад */
+    // Запис і читання
     s.runs_played = 12;
     s.max_score = 3200;
     assert(stats_save(&s, path) == 1);
@@ -21,7 +21,7 @@ int main(void) {
     assert(stats_load(&r, path) == 1);
     assert(r.runs_played == 12 && r.max_score == 3200);
 
-    /* зіпсований файл -> нулі */
+    // Пошкоджений файл
     FILE *f = fopen(path, "w");
     fputs("garbage", f);
     fclose(f);

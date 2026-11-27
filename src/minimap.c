@@ -1,14 +1,7 @@
-/*
- * minimap.c — перетворює позиції кімнат (grid_x, grid_y) на невелику схему.
- *
- * Кімната = клітинка з ПАРНИМИ координатами (0,2,4..), а між двома сусідніми
- * кімнатами лежить клітинка-проміжок з непарною координатою: у ній малюється
- * лінія, якщо між кімнатами є двері. Так видно, які кімнати з'єднані
- * насправді, а які просто стоять поруч.
- */
+// minimap.c - схема кімнат для мінімапи
 #include "minimap.h"
 
-/* Межі займаної області на сітці поверху. */
+// Межі зайнятої області сітки поверху
 static void bounds(const Floor *f, int *minx, int *miny, int *maxx, int *maxy) {
     *minx = *maxx = f->rooms[0].grid_x;
     *miny = *maxy = f->rooms[0].grid_y;
@@ -28,14 +21,14 @@ void minimap_cell_of(const Floor *f, int room, int *cx, int *cy) {
     *cy = (f->rooms[room].grid_y - miny) * 2;
 }
 
-/* Кімната "зачищена", коли в ній не лишилось живих ворогів
- * (стартова кімната без ворогів зачищена з самого початку). */
+// Кімната зачищена, коли немає живих ворогів
 static int is_cleared(const Room *r) {
     for (int i = 0; i < r->enemy_count; i++)
         if (r->enemies[i].hp > 0) return 0;
     return 1;
 }
 
+// Побудова схеми: кімнати через клітинку, між ними лінії проходів
 void minimap_build(const Floor *f, int current_room,
                    MiniCell out[MINIMAP_MAX][MINIMAP_MAX], int *w, int *h) {
     for (int y = 0; y < MINIMAP_MAX; y++)
@@ -57,7 +50,7 @@ void minimap_build(const Floor *f, int current_room,
         out[cy][cx].kind = is_cleared(r) ? MINI_ROOM_FILLED : MINI_ROOM_EMPTY;
         out[cy][cx].current = (i == current_room);
 
-        /* Прохід малюємо лише вправо та вниз, щоб кожну лінію поставити один раз. */
+        // Лінії проходів вправо і вниз
         if (r->door_target[DIR_RIGHT] >= 0) out[cy][cx + 1].kind = MINI_LINK_H;
         if (r->door_target[DIR_DOWN]  >= 0) out[cy + 1][cx].kind = MINI_LINK_V;
     }

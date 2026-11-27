@@ -1,25 +1,20 @@
-/*
- * stats.c — збереження статистики у текстовому файлі:
- *     runs_played=12
- *     max_score=3200
- */
+// stats.c - читання і запис stats.txt
 #include <stdio.h>
 #include "stats.h"
 
-/* Скидає статистику до нулів (використовується, якщо файлу ще немає). */
 void stats_defaults(Stats *s) {
     s->runs_played = 0;
     s->max_score = 0;
 }
 
-/* Читає файл. Якщо його немає або він пошкоджений — повертає нулі. */
+// Читання файлу, при помилці нулі
 int stats_load(Stats *s, const char *path) {
     stats_defaults(s);
     FILE *f = fopen(path, "r");
     if (!f) return 0;
 
     int runs = 0, best = 0;
-    /* пробіли у форматі пропускають будь-які розділювачі рядків */
+
     int n = fscanf(f, " runs_played=%d max_score=%d", &runs, &best);
     fclose(f);
 
@@ -29,7 +24,7 @@ int stats_load(Stats *s, const char *path) {
     return 1;
 }
 
-/* Перезаписує файл поточними значеннями. */
+// Запис файлу
 int stats_save(const Stats *s, const char *path) {
     FILE *f = fopen(path, "w");
     if (!f) return 0;
