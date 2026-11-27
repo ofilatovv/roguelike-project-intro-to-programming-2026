@@ -1,2 +1,0 @@
-runs_played=7
-max_score=1240
